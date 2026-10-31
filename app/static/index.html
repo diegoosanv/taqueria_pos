@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Sistema POS Taquería" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <title>Sistema POS Taquería - Auxiliar, Cocina y Administración</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span>Sistema POS Taquería</span>
+      <span class="live-badge" id="sync-indicator">En línea</span>
+    </div>
+    <div class="role-switcher">
+      <button class="role-btn active" id="btn-role-auxiliar" onclick="switchRole('auxiliar')">Auxiliar</button>
+      <button class="role-btn" id="btn-role-cocina" onclick="switchRole('cocina')">
+        <span>Cocina</span>
+        <span class="nav-counter" id="nav-cocina-badge">0</span>
+      </button>
+      <button class="role-btn" id="btn-role-admin" onclick="switchRole('admin')">Administración</button>
+      <button class="role-btn" onclick="abrirModalPin()" title="Ingresar con PIN de usuario">Cambiar Usuario (PIN)</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="view-auxiliar">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="card-title">Seleccionar Mesa</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 8px;">Toca una mesa disponible u ocupada para tomar o cobrar su orden</span>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="loadMesasAndMenu()">Actualizar Mesas</button>
+        </div>
+        <div id="mesas-container" class="mesas-grid"></div>
+      </div>
+
+      <div id="orden-workspace" class="grid-2 hidden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" id="mesa-seleccionada-titulo">Mesa Seleccionada</span>
+            <button class="btn btn-sm" onclick="agregarNuevoPlato()">+ Nuevo Plato</button>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Plato activo para agregar tacos:</div>
+            <div id="platos-tabs-container" class="platos-tabs"></div>
+
+            <div class="quick-notes-bar">
+              <button type="button" class="note-chip" onclick="agregarNotaRapidaPlato('Con todo')">Con todo</button>
+              <button type="button" class="note-chip" onclick="agregarNotaRapidaPlato('Sin cebolla')">Sin cebolla</button>
+              <button type="button" class="note-chip" onclick="agregarNotaRapidaPlato('Sin cilantro')">Sin cilantro</button>
+              <button type="button" class="note-chip" onclick="agregarNotaRapidaPlato('Dorados')">Dorados</button>
+              <button type="button" class="note-chip" onclick="agregarNotaRapidaPlato('Pura carne')">Pura carne</button>
+            </div>
+            <input type="text" id="plato-notas-input" class="input" placeholder="Notas del plato activo (ej. Con todo, Sin cebolla)" oninput="actualizarNotaPlatoActivo(this.value)" />
+          </div>
+
+          <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 8px; color: #93c5fd;">
+            Tacos y Quesadillas (Se envían a Cocina agrupados por plato)
+          </div>
+          <div id="menu-tacos-grid" class="menu-grid" style="margin-bottom: 16px;"></div>
+
+          <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 8px; color: #94a3b8;">
+            Refrescos y Bebidas (Solo se registran en la cuenta del Auxiliar, no van a Cocina)
+          </div>
+          <div id="menu-bebidas-grid" class="menu-grid"></div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Comanda Nueva por Agregar a la Mesa</span>
+              <button class="btn btn-sm btn-secondary" onclick="limpiarBorradorOrden()">Vaciar Borrador</button>
+            </div>
+            <div id="borrador-resumen-container" style="margin-bottom: 14px;"></div>
+            <button class="btn btn-block" id="btn-enviar-orden" onclick="enviarOrdenACocina()">
+              Guardar en Mesa / Enviar Tacos a Cocina
+            </button>
+          </div>
+
+          <div id="cuenta-abierta-card" class="card hidden">
+            <div class="card-header">
+              <span class="card-title">Cuenta Acumulada de la Mesa y Área de Cobro</span>
+              <span id="cuenta-abierta-estado" class="badge badge-info"></span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+              La cuenta permanece abierta en la mesa; puedes seguir agregando más platos o bebidas en cualquier momento antes de cobrar.
+            </div>
+            <div id="cuenta-abierta-detalle" style="margin-bottom: 14px;"></div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+              <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 8px;">Método de Pago</div>
+              <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                <button type="button" class="btn btn-sm" id="btn-metodo-efectivo" style="flex: 1;" onclick="seleccionarMetodoPago('efectivo')">Efectivo</button>
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-metodo-tarjeta" style="flex: 1;" onclick="seleccionarMetodoPago('tarjeta')">Tarjeta</button>
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-metodo-transferencia" style="flex: 1;" onclick="seleccionarMetodoPago('transferencia')">Transferencia</button>
+              </div>
+
+              <div id="bloque-efectivo-cambio" style="background: var(--surface-alt); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                <div class="grid-2-equal" style="align-items: center;">
+                  <div>
+                    <label class="metric-label">Monto Recibido ($)</label>
+                    <input type="number" id="input-monto-recibido" class="input" step="10" placeholder="0.00" oninput="actualizarCalculoCambio()" style="margin-top: 4px; font-weight: 700; font-size: 1.05rem;" />
+                  </div>
+                  <div>
+                    <div class="metric-label">Cambio a Entregar</div>
+                    <div id="texto-cambio-entregar" style="font-size: 1.45rem; font-weight: 700; color: #86efac; margin-top: 4px;">$0.00 MXN</div>
+                  </div>
+                </div>
+                <div class="quick-cash-row">
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido('exacto')">Pago Exacto</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido(50)">$50</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido(100)">$100</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido(200)">$200</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido(500)">$500</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="fijarMontoRecibido(1000)">$1000</button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-success" style="flex: 1; padding: 12px;" onclick="confirmarCobroOrden()">
+                  Confirmar Cobro y Cerrar Mesa
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="cancelarCuentaMesaActual()" title="Cancelar cuenta abierta">
+                  Cancelar Cuenta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historial de Cuentas del Día</span>
+          <button class="btn btn-sm btn-secondary" onclick="loadHistorialDiaAuxiliar()">Actualizar Historial</button>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="table" id="tabla-historial-auxiliar">
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Hora</th>
+                <th>Mesa</th>
+                <th>Productos</th>
+                <th>Método</th>
+                <th>Total</th>
+                <th>Recibido</th>
+                <th>Cambio</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-cocina" class="hidden">
+      <div class="card-header" style="margin-bottom: 14px;">
+        <div>
+          <h2 style="font-size: 1.2rem;">Pantalla de Cocina</h2>
+          <p style="font-size: 0.84rem; color: var(--text-muted);">
+            Solo se muestran tacos y alimentos de cocina (los refrescos no se envían aquí). La orden #1 en turno muestra cada plato detallado; las órdenes en espera muestran únicamente el conteo total de tacos hasta que les toque su turno.
+          </p>
+        </div>
+        <button class="btn btn-sm btn-secondary" onclick="loadColaCocina()">Actualizar</button>
+      </div>
+
+      <div id="kds-orden-actual-container"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Órdenes en Lista de Espera (Vista Previa de Tacos)</span>
+          <span id="kds-contador-espera" class="badge badge-info">0 en espera</span>
+        </div>
+        <div id="kds-cola-espera-container"></div>
+      </div>
+    </section>
+
+    <section id="view-admin" class="hidden">
+      <div class="subnav">
+        <button class="btn btn-sm" id="tab-admin-stats" onclick="switchAdminTab('stats')">Ventas, Caja y Gastos</button>
+        <button class="btn btn-sm btn-secondary" id="tab-admin-ia" onclick="switchAdminTab('ia')">Pronóstico, Simulación y Fugas</button>
+        <button class="btn btn-sm btn-secondary" id="tab-admin-inv" onclick="switchAdminTab('inv')">Inventario (Carnes y Cabezas)</button>
+        <button class="btn btn-sm btn-secondary" id="tab-admin-menu" onclick="switchAdminTab('menu')">Menú, Precios y Mesas</button>
+        <button class="btn btn-sm btn-secondary" id="tab-admin-users" onclick="switchAdminTab('users')">Usuarios y Roles</button>
+        <button class="btn btn-sm btn-secondary" id="tab-admin-import" onclick="switchAdminTab('import')">Importar Historial</button>
+      </div>
+
+      <div id="admin-panel-stats">
+        <div class="grid-4" style="margin-bottom: 16px;">
+          <div class="metric-box">
+            <div class="metric-label">Venta Total Hoy</div>
+            <div class="metric-value" id="stat-ventas-hoy">$0.00</div>
+            <div id="stat-desglose-metodos" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Efectivo: $0.00 | Tarjeta: $0.00</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Gastos Registrados</div>
+            <div class="metric-value" id="stat-gastos-hoy">$0.00</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Efectivo Esperado en Caja</div>
+            <div class="metric-value" id="stat-efectivo-esperado">$0.00</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Diferencia en Caja</div>
+            <div class="metric-value" id="stat-diferencia-caja">$0.00</div>
+          </div>
+        </div>
+
+        <div class="grid-2-equal">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Corte de Caja y Control de Diferencias</span>
+              <button class="btn btn-sm" onclick="guardarCorteCajaActual()">Guardar Corte del Turno</button>
+            </div>
+            <div class="grid-2-equal" style="margin-bottom: 12px;">
+              <div>
+                <label class="metric-label">Fondo Inicial de Caja ($)</label>
+                <input type="number" id="input-fondo-caja" class="input" value="1000" step="50" onchange="loadAdminAnalytics()" />
+              </div>
+              <div>
+                <label class="metric-label">Efectivo Físico Contado ($)</label>
+                <input type="number" id="input-efectivo-contado" class="input" placeholder="Conteo real" step="50" onchange="loadAdminAnalytics()" />
+              </div>
+            </div>
+            <div id="stat-cuadre-mensaje" style="margin-bottom: 10px;"></div>
+            <div id="stat-cusum-mensaje" style="font-size: 0.84rem; color: var(--text-muted);"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Registro por Texto / WhatsApp (Gastos e Inventario)</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+              Ejemplos: <code>gasto 350 carne</code>, <code>se fueron 5 kg de cabeza</code>, <code>entraron 3 cabezas</code>.
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <input type="text" id="input-gasto-rapido" class="input" placeholder="Escribe gasto o entrada/salida de carne o cabezas..." onkeydown="if(event.key==='Enter') enviarGastoRapido()" />
+              <button class="btn" onclick="enviarGastoRapido()">Registrar</button>
+            </div>
+            <div id="respuesta-asistente-texto" style="font-size: 0.82rem; color: #93c5fd; margin-bottom: 8px;"></div>
+            <div style="max-height: 150px; overflow-y: auto;">
+              <table class="table" id="tabla-ultimos-gastos">
+                <thead>
+                  <tr><th>Concepto</th><th>Tipo</th><th>Importe</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Historial de Ventas y Cuentas del Día</span>
+            <button class="btn btn-sm btn-secondary" onclick="loadAdminAnalytics()">Actualizar</button>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="table" id="tabla-historial-admin">
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Hora</th>
+                  <th>Mesa</th>
+                  <th>Auxiliar</th>
+                  <th>Productos</th>
+                  <th>Método</th>
+                  <th>Total</th>
+                  <th>Recibido</th>
+                  <th>Cambio</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Productos Vendidos Hoy (Acumulado por Artículo)</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="table" id="tabla-reporte-platillos">
+              <thead>
+                <tr><th>Producto</th><th>Categoría</th><th>Unidades Vendidas</th><th>Total Venta ($)</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="admin-panel-ia" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <span class="card-title">Simulador de Ventas y Compra de Insumos (Próximos 7 Días)</span>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                Calcula ventas esperadas (P10 / P50 / P90), kilos de carne, kilos de tortilla y piezas de cabeza de res según el historial y escenario elegido.
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-sim-085" onclick="cambiarFactorSimulacion(0.85)">Día Lluvioso (-15%)</button>
+              <button type="button" class="btn btn-sm" id="btn-sim-100" onclick="cambiarFactorSimulacion(1.0)">Demanda Normal (Base)</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-sim-115" onclick="cambiarFactorSimulacion(1.15)">Quincena (+15%)</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-sim-130" onclick="cambiarFactorSimulacion(1.30)">Evento / Puente (+30%)</button>
+            </div>
+          </div>
+
+          <div class="grid-4" style="margin-bottom: 14px;">
+            <div class="metric-box">
+              <div class="metric-label">Venta Estimada (7 Días)</div>
+              <div class="metric-value" id="sim-venta-7d">$0.00</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Venta Fin de Semana</div>
+              <div class="metric-value" id="sim-venta-finde">$0.00</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Carne y Cabezas (7 Días)</div>
+              <div class="metric-value" id="sim-carne-7d">0 kg</div>
+              <div id="sim-cabezas-7d" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Equivalente a 0 cabezas</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Tortilla Sugerida (7 Días)</div>
+              <div class="metric-value" id="sim-tortilla-7d">0 kg</div>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table" id="tabla-pronostico-ml">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Día</th>
+                  <th>Escenario Mín.</th>
+                  <th>Venta Esperada</th>
+                  <th>Escenario Máx.</th>
+                  <th>Tacos Est.</th>
+                  <th>Carne (kg)</th>
+                  <th>Cabezas (pzs)</th>
+                  <th>Tortillas (kg)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2-equal">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Detector de Fugas de Efectivo (CUSUM) e Historial de Cortes</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
+              Monitorea faltantes pequeños pero repetitivos a lo largo de varios turnos para detectar fugas hormiga antes de que crezcan.
+            </div>
+            <div id="ia-cusum-detalle" style="margin-bottom: 12px;"></div>
+            <div style="overflow-x: auto;">
+              <table class="table" id="tabla-historial-cortes">
+                <thead>
+                  <tr><th>Fecha</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th>Estado</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Memoria Aprendida del Clasificador de Texto / WhatsApp</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
+              Conceptos y proveedores aprendidos automáticamente cuando corriges o confirmas gastos por mensaje.
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="table" id="tabla-memoria-aprendida">
+                <thead>
+                  <tr><th>Palabra Clave</th><th>Categoría Asignada</th><th>Proveedor</th><th>Usos</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="admin-panel-inv" class="hidden">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Existencias Actuales (Cabezas por Pieza, Carnes por Kg y Bebidas)</span>
+              <button class="btn btn-sm btn-secondary" onclick="loadInventarioAdmin()">Actualizar</button>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="table" id="tabla-inventario">
+                <thead>
+                  <tr>
+                    <th>Insumo</th>
+                    <th>Unidad</th>
+                    <th>Existencia Actual</th>
+                    <th>Estado</th>
+                    <th>Ajuste Rápido</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Dar de Alta Nuevo Insumo</span>
+            </div>
+            <div style="display: grid; gap: 10px;">
+              <input type="text" id="inv-nombre" class="input" placeholder="Nombre (ej. Cabeza de Res, Carne de Cabeza, Suadero)" />
+              <select id="inv-categoria" class="select">
+                <option value="cabeza_pieza">Cabeza por Pieza</option>
+                <option value="carne">Carne por Kilogramo</option>
+                <option value="tortilla">Tortilla / Masa</option>
+                <option value="bebida">Bebida por Pieza</option>
+              </select>
+              <select id="inv-unidad" class="select">
+                <option value="pieza">Pieza (ej. Cabezas enteras, Refrescos)</option>
+                <option value="kg">Kilogramos (kg)</option>
+              </select>
+              <div class="grid-2-equal">
+                <input type="number" id="inv-stock" class="input" placeholder="Existencia inicial" step="0.5" value="5" />
+                <input type="number" id="inv-minimo" class="input" placeholder="Alerta mínimo" step="0.5" value="1" />
+              </div>
+              <button class="btn" onclick="crearInsumoAdmin()">Guardar Insumo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="admin-panel-menu" class="hidden">
+        <div class="grid-2-equal">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Productos del Menú y Precios</span>
+            </div>
+            <div style="display: grid; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border);">
+              <div class="grid-2-equal">
+                <input type="text" id="menu-nuevo-nombre" class="input" placeholder="Nombre (ej. Suadero, Tripa)" />
+                <input type="number" id="menu-nuevo-precio" class="input" placeholder="Precio ($ MXN)" step="1" />
+              </div>
+              <div class="grid-2-equal">
+                <select id="menu-nuevo-cat" class="select">
+                  <option value="tacos">Tacos / Quesadillas (Se envía a Cocina)</option>
+                  <option value="bebidas">Bebidas (Solo Auxiliar, no va a Cocina)</option>
+                </select>
+                <select id="menu-nuevo-insumo" class="select">
+                  <option value="">Sin descontar insumo específico</option>
+                </select>
+              </div>
+              <button class="btn" onclick="crearProductoAdmin()">+ Agregar Producto al Menú</button>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="table" id="tabla-menu-admin">
+                <thead>
+                  <tr><th>Producto</th><th>Categoría</th><th>Precio ($)</th><th>Acción</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Gestión de Mesas</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+              <input type="text" id="mesa-nueva-nombre" class="input" placeholder="Ej. Mesa 7, Para Llevar 2" />
+              <button class="btn" onclick="crearMesaAdmin()">+ Agregar Mesa</button>
+            </div>
+            <div id="lista-mesas-admin" class="mesas-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="admin-panel-users" class="hidden">
+        <div class="grid-2-equal">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Usuarios con Acceso y Roles Asignados</span>
+              <button class="btn btn-sm btn-secondary" id="btn-toggle-pins" onclick="toggleMostrarPinsUsuarios()">Mostrar PINs</button>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="table" id="tabla-usuarios-admin">
+                <thead>
+                  <tr><th>Nombre</th><th>Rol Asignado</th><th>PIN de Acceso</th><th>Acción</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Crear Nuevo Usuario / Asignar Rol</span>
+            </div>
+            <div style="display: grid; gap: 10px;">
+              <input type="text" id="user-nuevo-nombre" class="input" placeholder="Nombre (ej. Pedro, Auxiliar 2)" />
+              <select id="user-nuevo-rol" class="select">
+                <option value="auxiliar">Auxiliar (Toma pedidos y cobra mesas)</option>
+                <option value="cocina">Cocina (Pantalla de preparación de tacos)</option>
+                <option value="admin">Administración (Control total, ventas e inventario)</option>
+              </select>
+              <input type="password" id="user-nuevo-pin" class="input" placeholder="PIN de 4 dígitos" />
+              <button class="btn" onclick="crearUsuarioAdmin()">Guardar Usuario</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="admin-panel-import" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Importar Historial de Ventas (HTML, JSON o CSV)</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 14px;">
+            Selecciona tus reportes anteriores en formato <strong>.HTML</strong>, <strong>.JSON</strong> o <strong>.CSV</strong> para cargarlos al historial de ventas.
+          </p>
+          <div class="grid-2-equal" style="margin-bottom: 12px;">
+            <div>
+              <label class="metric-label">Fecha del reporte</label>
+              <input type="date" id="import-fecha-input" class="input" />
+            </div>
+            <div>
+              <label class="metric-label">Archivo (.html, .json, .csv)</label>
+              <input type="file" id="import-file-input" class="input" accept=".html,.htm,.json,.csv" multiple />
+            </div>
+          </div>
+          <button class="btn" onclick="subirHistoricoDidan()">Importar Archivo al Historial</button>
+          <div id="import-resultado-msg" style="margin-top: 12px;"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-pin" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="card-header">
+        <span class="card-title" id="modal-pin-titulo">Ingresar con PIN</span>
+        <button class="btn btn-sm btn-secondary" onclick="cerrarModalPin()">Cerrar</button>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
+        Ingresa tu clave numérica personal para cambiar de perfil.
+      </div>
+      <input type="password" id="modal-pin-input" class="input" placeholder="••••" autocomplete="off" style="margin-bottom: 12px; font-size: 1.1rem; text-align: center;" onkeydown="if(event.key==='Enter') confirmarModalPin()" />
+      <button class="btn btn-block" onclick="confirmarModalPin()">Entrar</button>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

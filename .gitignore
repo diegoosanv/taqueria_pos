@@ -1,0 +1,32 @@
+# Variables de entorno y claves de API (NUNCA subir a Git)
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales de Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Base de datos local SQLite
+*.db
+*.sqlite
+*.sqlite3
+taqueria.db
+
+# Archivos compilados de Android
+android_apk/.gradle/
+android_apk/build/
+android_apk/app/build/
+android_apk/local.properties
+*.keystore
+*.jks
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.log
