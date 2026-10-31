@@ -19,7 +19,7 @@ Aplicación web y punto de venta para operación de taquería con interfaz para 
   - Corte de caja en tiempo real desglosado por método de pago y monitoreo de diferencias acumuladas (CUSUM) para detectar fugas de efectivo.
   - Registro de gastos y movimientos de inventario mediante lenguaje natural (web o webhook de WhatsApp) con memoria de conceptos y proveedores frecuentes.
   - Simulador de demanda y pronóstico a 7 días con estimación de ventas, kilos de carne, kilos de tortilla y piezas de cabeza de res.
-  - Control de inventario por pieza y por kilogramo, edición de menú y precios, administración de usuarios por rol e importación de reportes históricos (`.html`, `.json`, `.csv`).
+  - Control de inventario por pieza y por kilogramo, edición de menú y precios, administración de usuarios por rol e importación de reportes históricos  de otros pos (`.html`, `.json`, `.csv`).
 
 ## Instalación y ejecución local
 
